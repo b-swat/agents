@@ -1,288 +1,288 @@
-# AGENTS.md — Shared Rules for Collaborative Development
+# AGENTS.md — Shared Rules for All AI Agents
 
-This document is mandatory for all participants: the human lead, ChatGPT and Claude.
-If rules conflict, the priority is:
-**direct instruction from the lead > AGENTS.md > CLAUDE.md / CHATGPT.md > docs/agent/***.
+This file is the single source of rules for every AI agent working in this repository
+(Claude, ChatGPT/Codex, DeepSeek, Copilot, Cursor, Gemini and others).
+Agent-specific files (e.g. `CLAUDE.md`) only point here and must not contradict this file.
 
-## 0. MAIN RULES
+Priority when rules conflict:
+**direct instruction from the user > AGENTS.md > MEMORY.md > agent defaults**.
 
-### 0.1 Language and Format
+**Reading order before working with any repository:**
 
-These rules override everything else in this workspace.
+1. `AGENTS.md` (this file) — general rules.
+2. [`MEMORY.md`](MEMORY.md) — project-specific details and pitfalls (section 7).
 
-| What | Requirement |
-|---|---|
-| All documents created as a result of work (task specs, questions, answers, translations, memory, notes, these instruction files) | **Strictly English**, **Markdown (`.md`) format** |
-| PDF | Only an **export copy** of a task spec, generated locally from the `.md`. Never edited, never used as input, never analyzed |
-| Diagrams inside documents | **Mermaid only** (fenced ` ```mermaid ` blocks); no ASCII art, no embedded images of diagrams |
-| Code: identifiers, comments, commit messages | English |
-| Commit messages | No additional signatures/trailers; format matches the repository's existing commits ([docs/agent/git.md](docs/agent/git.md)) |
-| Claude's internal reasoning | English |
-| Replies to the lead in chat | **Russian** |
+Do not start work in a repository until both files have been read.
 
-### 0.2 Document Placement — Working Directory vs. Repositories
+## 0. Project Layout
 
-| What | Where |
-|---|---|
-| **All working and temporary documents** — task specs, briefs, questions, answers, translations, memory files, notes, drafts, logs | **Working directory (this workspace), outside the project repositories** |
-| **Documents inside a project repository** (README, design docs, any `.md`, `.rst`, `.pdf`, `.docx`, …) | **Only on explicit request from the lead** |
+These instructions are a template. The folder that contains this file is placed **inside** the project;
+the **project root is one level above** it (`../` relative to this file).
 
-- Agents never add, commit or leave working documents inside a repository. Only code, tests and build files
-  required by the task go into the repository.
-- Code comments with requirement IDs (`/* REQ-UARTDMA-03 */`) and test names are code, not documents — allowed.
-- Enforced for Claude Code by a hook: writing a document file inside a repository requires the lead's confirmation
-  ([.claude/hooks/guard-repo-docs.py](.claude/hooks/guard-repo-docs.py)).
-
-### 0.3 Local Development and Tools
-
-- **Development is local.** All tools are installed locally. **No internet search** for datasheets, documentation
-  or tools. If a datasheet, document or tool is missing — **ask the lead**; the lead finds and adds it.
-- Datasheets and other source documents are in `docs/sources/` (local only).
-- **Supported OS: macOS and Ubuntu.** Every script, hook, skill and command must work on both:
-  - scripts in **Python 3** (stdlib; extra packages documented with `pip` install) or POSIX `sh`;
-  - no GNU-only options (`sed -i` without suffix, `readlink -f`, `date -d`, `grep -P`), no Bash 4+ features
-    (macOS ships Bash 3.2), no `jq` dependency;
-  - binaries are located per OS (e.g. Chrome: `google-chrome` on Ubuntu, `/Applications/Google Chrome.app/...` on macOS);
-  - install instructions are given for both (`apt` / `brew`).
-- **Skills for repeatable local procedures.** Once the tools and the exact sequence of steps for a local
-  procedure are established (build, test run, flashing, static analysis, PDF export, …), Claude creates a
-  **skill** in this workspace: `.claude/skills/<name>/SKILL.md` (plus scripts next to it), so the procedure is
-  reused instead of rediscovered. A skill records: purpose, prerequisites for macOS and Ubuntu, exact commands,
-  expected output, known problems. A procedure specific to one repository is recorded in that project's
-  `MEMORY.md` and, if reused, as a skill named `<project>-<procedure>`.
-
-Applies to both Claude and ChatGPT.
-
-## 1. Project
-
-- Type: embedded development, C/C++. Build: CMake. Tests: GoogleTest / GoogleMock.
-- Process: **Test-Driven Development (TDD)** — see [docs/agent/testing.md](docs/agent/testing.md).
-  Every requirement becomes a test before it becomes code.
-- Platform, toolchain, RTOS: see [docs/agent/embedded.md](docs/agent/embedded.md) (TBD).
-
-### Adapting to existing repositories
-
-Projects are developed in **existing repositories**. Everything marked `TBD` or `[ASSUMPTION]` in these
-instructions (platform, toolchain, C/C++ standard, code style, naming, directory layout, CMake structure,
-test layout, commit format, branch naming, merge method, static analysis) is **derived from the repository being worked on**:
-
-- Before the first task in a repository, analyze it: `CMakeLists.txt` / toolchain files, `.clang-format`,
-  `.clang-tidy`, `.editorconfig`, existing source and test code, `git log`, branches, CI configuration, README.
-- **Existing repository conventions take precedence** over defaults and `[ASSUMPTION]` items in these documents.
-  The Main Rules (section 0) and TDD are not overridden.
-- Record the detected conventions in the project's `MEMORY.md` as decisions (`D-NNN`, author: the agent,
-  reference: files the convention was derived from).
-- If conventions are inconsistent or missing — follow the most recent code, and ask the lead.
-
-## 2. Roles
-
-| Participant | Responsible for | Does not do |
-|---|---|---|
-| **Lead** (human) | Defines tasks and priorities; passes materials between agents; provides missing datasheets/tools; approves plan; confirms tests; accepts results | — |
-| **ChatGPT** | **Writes the task spec** (Lite or Full) from the task statement and Claude's brief; **re-tests** by the "Test Procedure" of a spec when asked; translations on request; answers requirement questions | Does not write code; does not write the developer review, development plan or test plan; does not analyze source documents for the spec |
-| **Claude** | Studies memory and code, writes the brief for ChatGPT; **checks the spec against local datasheets and checks requirements for testability**; writes the development and test plans; exports the PDF; writes tests and the "Test Procedure", implements, runs tests, commits, merges into `development` | Does not change requirements written by ChatGPT (raises findings instead); does not add tests before confirmation or implement before plan approval; does not search the internet |
-
-## 3. Development Workflow
-
-```mermaid
-flowchart TD
-    T["1. Task defined (Lead)"] --> MEM["2. Study memory (Claude)"]
-    MEM --> CODE["3. Study code (Claude)"]
-    CODE --> BR["4. Brief for ChatGPT (Claude)<br/>work/&lt;project&gt;/...-brief.md"]
-    BR --> SPEC["5. Task spec, Lite or Full (ChatGPT)<br/>docs/tasks/YYYY-MM-DD-task-name.md"]
-    SPEC --> REV["6. Review (Claude): datasheets + testability<br/>development plan + test plan, PDF export"]
-    REV -- "findings in requirements" --> SPEC
-    REV -- "missing datasheet" --> ASK["Ask the lead"] --> REV
-    REV --> G1{"7. Lead approves plan?"}
-    G1 -- No --> REV
-    G1 -- Yes --> G2{"8. Lead confirms tests?"}
-    G2 -- No --> REV
-    G2 -- Yes --> TST["9. Task branch from development<br/>add tests (RED)"]
-    TST --> IMP["10. Implement (GREEN, REFACTOR)"]
-    IMP --> RUN["11. Run full test suite + build<br/>record Test Procedure in the spec"]
-    RUN -- Fail --> IMP
-    RUN -- Pass --> COM["12. Commit"]
-    COM --> CL["13. Close: merge into development,<br/>completion report, PDF, MEMORY.md"]
-    CL -. "optional" .-> RT["Re-test by Test Procedure<br/>(ChatGPT / Lead) → Re-test Log"]
+```
+<project-root>/
+├── <instructions-folder>/   <- this file, MEMORY.md, CLAUDE.md
+├── <repo-1>/                <- source code, separate git repository
+├── <repo-2>/                <- source code, separate git repository
+├── DataSheets/              <- datasheets and other source materials
+├── docs/                    <- generated documents
+├── tasks/                   <- technical specifications (task specs)
+├── tmp/                     <- scripts and intermediate files
+├── tools/                   <- Dockerfiles and local build/test tools
+└── worktrees/               <- git worktrees of active tasks
 ```
 
-| # | Step | Who | Output |
-|---|---|---|---|
-| 1 | **Task defined** | Lead | Task statement in chat; datasheets in `docs/sources/` if needed |
-| 2 | **Study memory** | Claude | `memory/<project>/MEMORY.md`, `memory/MEMORY_REL.md`, earlier task specs |
-| 3 | **Study code** | Claude | Relevant code, tests, build files in `../<project>/`; conventions on the first task in a repository |
-| 4 | **Brief for ChatGPT** | Claude | `work/<project>/YYYY-MM-DD-<task-name>-brief.md`: task, code context, memory context, proposed type (Lite/Full), tag, relevant datasheets |
-| 5 | **Task spec** | ChatGPT | `docs/tasks/YYYY-MM-DD-<task-name>.md` from [_TEMPLATE_LITE.md](docs/tasks/_TEMPLATE_LITE.md) or [_TEMPLATE_FULL.md](docs/tasks/_TEMPLATE_FULL.md) |
-| 6 | **Review** | Claude | "Developer Review": every requirement/parameter checked against **local** datasheets; every requirement checked for testability; missing materials requested from the lead. Then "Development Plan" and "Test Plan"; PDF export |
-| 7 | **Approve plan** | Lead | Recorded in the "Approvals" table of the spec |
-| 8 | **Confirm tests** | Lead | Recorded in the "Approvals" table. **Tests are added only after this** |
-| 9 | **Add tests** | Claude | Task branch from `development`; tests from the confirmed plan, each seen failing (RED); "Test Procedure" started |
-| 10 | **Implement** | Claude | Minimal code to pass, then refactor (TDD) |
-| 11 | **Run tests** | Claude | Full test suite and build pass; **"Test Procedure" in the spec completed in the strict format** (environment, tools with versions, prerequisites for macOS/Ubuntu, exact steps, results) and validated |
-| 12 | **Commit** | Claude | Commit(s) on the task branch per [docs/agent/git.md](docs/agent/git.md) |
-| 13 | **Close** | Claude | Merge the task branch into `development`; "Completion Report"; PDF re-export; `MEMORY.md`; status `Done`. Push — only on request |
-| — | **Re-test** (optional) | ChatGPT / Lead | Execute "Test Procedure" exactly as written; add a row to "Re-test Log" ([docs/agent/testing.md](docs/agent/testing.md), "Test Procedure Format") |
+- Agents are started from the instructions folder; all project work happens in `../`.
+- All paths in these instructions and in the agent's reports are relative to the **project root**,
+  unless stated otherwise.
 
-### Task spec types
-
-| Type | When | Template |
+| Folder | Purpose | Rules |
 |---|---|---|
-| **Lite** | Bug fixes, small local changes (one module, no interface/architecture change, no hardware timing) | [docs/tasks/_TEMPLATE_LITE.md](docs/tasks/_TEMPLATE_LITE.md) |
-| **Full** | Features, interface/architecture changes, hardware-related work, several modules | [docs/tasks/_TEMPLATE_FULL.md](docs/tasks/_TEMPLATE_FULL.md) |
+| `<repo>/` | Source code of the project, one folder per git repository | Only code, tests and build files required by the task. Git rules: section 4 |
+| `DataSheets/` | Datasheets, reference manuals, standards | Read only. If a needed document is missing, ask the user |
+| `docs/` | Generated documents in any format (`.md`, `.pdf`, `.docx`, `.xlsx`, ...) | Created on the user's request |
+| `tasks/` | Technical specifications, one file per task | File name: `YYYY-MM-DD-<task-name>.md` (date the task was created, `<task-name>` in English kebab-case) |
+| `tmp/` | Helper scripts and intermediate files | Never cleaned automatically: do not delete files here unless the user asks |
+| `tools/` | Build and test tools, Dockerfiles and their notes | See section 6 |
+| `worktrees/` | Git worktrees of active tasks: `worktrees/<repo>/<task-name>/` | One worktree per task, see section 4.1 |
 
-Claude proposes the type in the brief; the lead decides.
+- **Temporary and helper files go only to `tmp/`**: scripts, logs, dumps, intermediate data,
+  drafts. Do not use the system temp directory or the agent's own scratch area instead.
+- **Temporary files must never get into a repository**: do not create them inside `<repo>/`,
+  do not stage or commit them. Check `git status` before every commit.
+- Documents (`docs/`, `tasks/`) are not placed inside `<repo>/` unless the user asks.
+- If a folder is not listed above, ask the user before creating or changing files in it.
+- Git commands (section 4) run inside `<repo>/` or the task worktree, not in the project root
+  or the instructions folder.
 
-### Task spec file
+## 1. Language
 
-- Location: `docs/tasks/`. Name: **`YYYY-MM-DD-<task-name>.md`** — date + short task name in English, kebab-case.
-  Example: `2026-11-02-uart-dma-driver.md`.
-- **All task specs are Markdown.** The PDF (`YYYY-MM-DD-<task-name>.pdf`, same folder) is only an export copy,
-  generated locally with the `export-pdf` skill after every change of the `.md`.
-- Sections have owners (stated in the template). Each participant edits only their own sections; findings about
-  someone else's section are raised, not silently fixed.
-- Changes after approval: version bump + "Revision History"; changes to requirements, plan or tests need re-approval.
+| What | Language |
+|---|---|
+| Code: identifiers, string literals, log messages, error messages | English |
+| Code comments and docstrings | English |
+| Commit messages, branch names, tags | English |
+| Documentation and any file added to the repository | English |
+| Replies to the user in chat | The user's language |
 
-### Approvals
+- **Russian (and any Cyrillic text) is forbidden in the codebase.** It must never get into a file
+  that is committed: source code, comments, tests, configs, scripts, docs, commit messages.
+- If the user gives a task, a comment text or a name in Russian, translate it into English
+  before putting it into the code.
+- If existing code already contains Cyrillic text, do not add more; report it to the user
+  instead of silently rewriting unrelated code.
+- Before every commit, check the staged changes for Cyrillic characters:
 
-- The lead records decisions in the **"Approvals" table of the task spec** (gate, decision, date, notes).
-  If the lead approves in chat, Claude records it in the table with the note "via chat".
-- **No tests before "Tests: Confirmed", no implementation before "Plan: Approved".**
-- If implementation shows that the plan or tests must change — stop, update the spec, get re-approval.
+  ```sh
+  git diff --cached | grep -nP '[\x{0400}-\x{04FF}]'
+  ```
 
-## 4. Workspace Layout
+  The command must print nothing. If it prints anything, fix it before committing.
 
-The workspace (working directory, this `AGENTS/` folder) holds the instructions, skills and all working documents.
-Project repositories live **one level above**, next to the workspace — so nothing in the workspace is inside a repository.
+## 2. File Format
+
+- All instruction and documentation files are **Markdown (`.md`)**.
+- Diagrams inside documents: Mermaid (fenced ` ```mermaid ` blocks).
+- Do not create documentation files unless the user asks for them.
+- Where files go: generated documents — `docs/`, task specs — `tasks/`,
+  temporary files — `tmp/` (section 0).
+
+## 3. Code
+
+- Follow the existing style of the repository (formatting, naming, layout, patterns).
+  Check config files first: `.editorconfig`, `.clang-format`, `.clang-tidy`, linters, CI configuration.
+- Keep changes focused on the task; do not refactor or reformat unrelated code.
+- Comments explain *why*, not *what*. No commented-out code, no leftover debug output.
+- Do not add new dependencies without the user's approval.
+- Build and run the existing tests before reporting a task as done. Report failures honestly,
+  with the actual output.
+
+## 4. Git
+
+### 4.1 Branches
+
+- The main branch of every repository is **`development`**.
+- **Every task gets its own branch, created from `development`.** Never commit task work
+  directly to `development`.
+- Branch name: follow the repository's existing convention (check `git branch -a`).
+  If there is none, use `task/YYYY-MM-DD-<task-name>` — the same base name as the task spec
+  in `tasks/`.
+- If `development` does not exist locally or on the server, stop and ask the user.
+
+#### Parallel tasks
+
+Several tasks can be in progress at the same time, in the same repository. To keep them
+from interfering, **each task works in its own git worktree**:
+
+- `<repo>/` (the main working copy) always stays on `development`. Do not switch it to a task
+  branch and do not edit code there. It is used for the sync check and for the merge at task close.
+- Each task has its own worktree: `worktrees/<repo>/<task-name>/`, checked out on the task branch.
+  All code changes, builds and tests of the task happen only there.
+- Never touch another task's worktree or branch.
+- List active tasks: `git worktree list` (run in `<repo>/`).
 
 ```mermaid
 flowchart LR
-    PARENT["Parent directory"] --> WS["AGENTS/<br/>workspace (working directory)"]
-    PARENT --> RP["&lt;project&gt;/<br/>git repository: code, tests, build files only"]
-    WS --> A["AGENTS.md / CLAUDE.md / CHATGPT.md"]
-    WS --> CL[".claude/<br/>settings, hooks, skills"]
-    WS --> D["docs/"]
-    WS --> M["memory/"]
-    WS --> W["work/<br/>briefs, notes, logs"]
-    D --> TK["tasks/ — task specs .md (+ .pdf export), templates"]
-    D --> S["sources/ — datasheets, read-only"]
-    D --> H["handoff/ — questions and answers"]
-    D --> AG["agent/ — detailed development rules"]
-    D --> T["templates/ — MEMORY templates"]
-    D --> GL["glossary.md"]
-    M --> MP["&lt;project&gt;/MEMORY.md + archive/"]
-    M --> MR["MEMORY_REL.md"]
+    DEV["development<br/>(&lt;repo&gt;/)"] --> T1["task/...-a<br/>(worktrees/&lt;repo&gt;/a/)"]
+    DEV --> T2["task/...-b<br/>(worktrees/&lt;repo&gt;/b/)"]
+    T1 -- "task closed: merge" --> DEV
+    T2 -- "task closed: merge" --> DEV
 ```
 
-- `../<project>/` — the project's git repository, a sibling of the workspace. A project is any directory
-  next to `AGENTS/` that is a git repository. If a repository lives elsewhere, its path is recorded in
-  "Project Summary" of its `MEMORY.md`.
-- Claude Code is started from the workspace (`AGENTS/`) so that these instructions, hooks and skills are loaded;
-  repositories are accessed as `../<project>/`.
-- `work/<project>/` — temporary documents; may be cleaned up by the lead at any time; not a source of truth.
+#### Sync check (mandatory before creating a branch and before merging)
 
-## 5. General Rules
+Run in `<repo>/`:
 
-- **Consistent terminology.** Terms are defined in [docs/glossary.md](docs/glossary.md).
-- **Source references.** Every requirement or parameter (register, timing, voltage, etc.)
-  includes a reference: local document + section/page/table, or code location.
-- **Assumptions are marked explicitly**: `[ASSUMPTION]`. An assumption is not a requirement
-  until the lead confirms it.
-- **Do not invent.** If data is missing, write `TBD` and ask the lead.
-- **Requirement IDs** are `REQ-<TAG>-<NN>`, where `<TAG>` is the short uppercase task tag from the spec
-  header (e.g. `REQ-UARTDMA-03`). Tests and code comments reference these IDs.
+```sh
+git fetch origin
+git status --porcelain
+git rev-list --left-right --count development...origin/development
+```
 
-## 6. Project Memory — MEMORY.md and MEMORY_REL.md
+- `git status --porcelain` prints nothing — the working copy is clean.
+- `rev-list` prints `0	0` — local `development` is in sync with `origin/development`.
+  The first number is commits only in local `development` (not pushed),
+  the second is commits only on the server (not pulled).
 
-Local project memory is shared by all agents and the lead. It is the single source of truth
-for what changed, when, by whom and why. Files are English Markdown and live in the working directory,
-**outside the repositories** (section 0.2).
+**If the code is not in sync** (uncommitted changes, local commits not pushed, server commits
+not pulled, or branches diverged): **stop and notify the user** with the output of the commands
+above. Do not `pull`, `merge`, `rebase`, `reset` or `stash` to fix it yourself — the user decides
+how to sync.
 
-| File | Where | When |
-|---|---|---|
-| `MEMORY.md` | `memory/<project>/MEMORY.md` — one per project under development | Always — created when the project appears |
-| `MEMORY_REL.md` | `memory/MEMORY_REL.md` | Only when projects are related (shared code, protocol, hardware, interface, dependency) |
+#### Starting a task
 
-`<project>` is the repository directory name (`../<project>/`).
+1. Sync check (above) passes.
+2. Create the task branch and its worktree from `development` (run in `<repo>/`):
 
-Templates: [docs/templates/MEMORY_TEMPLATE.md](docs/templates/MEMORY_TEMPLATE.md),
-[docs/templates/MEMORY_REL_TEMPLATE.md](docs/templates/MEMORY_REL_TEMPLATE.md).
+   ```sh
+   git worktree add -b task/YYYY-MM-DD-<task-name> ../worktrees/<repo>/<task-name> development
+   ```
 
-### Triggers — files are created and updated automatically
+3. Tell the user the branch name and the worktree path.
 
-| Trigger | Action |
-|---|---|
-| **New project appears** — a new git repository next to the workspace, or work starts on a project without `MEMORY.md` | Create `memory/<project>/MEMORY.md` from the template immediately, fill "Project Summary" and "Current State", add `C-001: Project created / memory initialized` |
-| **A relation between projects is detected** | Create `memory/MEMORY_REL.md` (if missing), add relation `R-NNN` and an `XC-NNN` entry |
-| **Any change or decision** during a task | Append entries as described under "Rules" |
-| **Command "update local memory"** (RU: «обнови локальную память», «обновить локальную память») or `/memory-update` | Run the full update procedure below |
+#### Closing a task: merge into `development`
 
-Full update procedure (on command):
+When the user closes a task, its changes **must be merged into `development`**:
 
-1. Scan the parent directory for git repositories (projects). For each project without `memory/<project>/MEMORY.md` — create it.
-2. For each project, compare the current state with the last memory entry (git log, task specs, `Q-*` answers).
-   Append `C-NNN` / `D-NNN` entries for unrecorded changes and decisions, marked `[RECONSTRUCTED]`.
-3. Refresh "Current State" in every `MEMORY.md`.
-4. Detect relations between projects; create/update `memory/MEMORY_REL.md`.
-5. Apply size control (below).
-6. Report to the lead (in chat, Russian): files created, entries added, files archived, what could not be determined.
+1. In the task worktree: everything is committed (`git status --porcelain` prints nothing),
+   build and tests pass.
+2. In `<repo>/`: sync check passes.
+3. Merge (run in `<repo>/`), using the repository's merge convention; by default:
 
-**Automatic check (Claude Code).** A `SessionStart` hook ([.claude/hooks/check-memory.py](.claude/hooks/check-memory.py))
-reminds Claude about projects without `MEMORY.md`, a missing `MEMORY_REL.md` (2+ projects) and oversized memory files.
+   ```sh
+   git merge --no-ff task/YYYY-MM-DD-<task-name>
+   ```
 
-### Size control
+   The merge commit message follows section 4.2.
+4. Build and run tests again on `development`.
+5. **Merge conflicts or failing build/tests after the merge — stop and notify the user.**
+   Do not resolve conflicts by deleting code or tests, and do not touch the changes of other tasks.
+6. Report to the user: merged branch, merge commit, test results. The local `development` is now
+   ahead of the server — push only when the user asks.
+7. The task branch and worktree are kept. Remove them only when the user asks:
+   `git worktree remove ../worktrees/<repo>/<task-name>`, `git branch -d task/...`.
 
-Memory files are read at the start of every task, so their size is limited:
+After a merge, other active task branches do not get the new changes automatically. Do not
+merge or rebase them onto `development` unless the user asks; if a task depends on merged
+changes, tell the user.
 
-- **Limit:** `MEMORY.md` and `MEMORY_REL.md` — **300 lines or 30 KB**, whichever comes first.
-- **When exceeded**, the oldest entries are moved **verbatim** to `memory/<project>/archive/MEMORY-YYYY.md`
-  (`memory/archive/MEMORY_REL-YYYY.md` for cross-project), by the year of the entry:
-  - "Change History": keep the latest 50 entries;
-  - "Decisions": keep all decisions with status `Accepted`; move `Superseded` ones;
-  - "Current State" and "Project Summary" stay and are kept short.
-- The main file gets a line in "Archive": file name + ID range moved. Archiving is the only allowed way to remove
-  entries from the main file; archived entries are never edited.
-- Archive files are read only when older history is needed.
+### 4.2 Commit message format
 
-### What is recorded
+The commit message format **must match the existing history of the repository**.
+Before the first commit in a session, inspect the log:
 
-- **Change history** — every change: date, agent, what changed, files, commit, task spec / REQ reference.
-- **Decisions** — context, decision, rationale, rejected alternatives, who approved.
-- **Current state** — short summary of where the project is now, kept up to date.
-- In `MEMORY_REL.md` additionally: relations between projects, shared interfaces/contracts, cross-project changes and decisions.
+```sh
+git log --format='%s%n%b%n---' -n 30
+```
 
-### Rules
+Detect and follow:
 
-- **Read before work.** Before starting any task, an agent reads the project's `MEMORY.md`
-  (and `MEMORY_REL.md` if it exists).
-- **Update after work.** After every change or decision, the agent that made it adds an entry
-  in the same session — before reporting the task as done.
-- **Append-only.** Existing entries in "Change History" and "Decisions" are never edited or deleted
-  (except archiving, above). Corrections are new entries that reference the old one; a decision is replaced by a
-  new decision with status `Supersedes D-NNN`, and the old one gets status `Superseded by D-NNN` (the only allowed edit).
-- **Cross-project changes** are recorded in both places: a short entry in each affected `MEMORY.md`
-  with a link to the detailed entry in `MEMORY_REL.md`.
-- **Facts only.** Record what was done and decided, not plans; unconfirmed items are `[ASSUMPTION]`.
-- **Entry IDs:** changes `C-NNN`, decisions `D-NNN` (per project); in `MEMORY_REL.md` — `XC-NNN`, `XD-NNN`.
+- subject prefix convention (none, `feat:`, `fix(scope):`, `[MODULE]`, `PROJ-123:`, ...);
+- capitalization, mood (imperative / past tense), length, trailing period;
+- whether a body is used, and how it is wrapped and formatted;
+- how tickets/issues are referenced;
+- trailers the repository itself uses (e.g. `Signed-off-by`), if any.
 
-### Who writes what
+If the history is inconsistent, follow the most recent commits.
 
-| Agent | Records |
-|---|---|
-| Claude | Code changes and commits, implementation decisions, review findings, build/test results, conventions, skills created |
-| ChatGPT | Task specs written/updated, re-test runs and results, requirement clarifications, translations, answers to questions |
-| Lead | Approvals, priorities, decisions passed verbally (an agent records them on the lead's behalf, author `Lead`) |
+If the repository has no history yet, use a short subject in English, capitalized,
+imperative mood, no prefix, no trailing period, no body (e.g. `Add UART driver`),
+and tell the user which format was chosen.
 
-## 7. Skills (Claude Code)
+### 4.3 Mandatory rules
 
-Local skills in `.claude/skills/`, invoked as `/<name>`:
+- English only (see section 1).
+- **No extra signatures or trailers** that the history does not use: no `Co-Authored-By`,
+  no "Generated with ...", no agent names, no emoji, no links to sessions.
+- One logical change per commit.
+- Allowed without asking: `git fetch`; creating a task branch and worktree after a successful
+  sync check (4.1); commits on the task branch within the task.
+- Merge into `development` — when the user closes the task (4.1).
+- Push, pull, rebase, rewrite history, delete branches or worktrees **only when the user asks**.
+- Never commit secrets, credentials, build artifacts, local editor/agent files,
+  or anything from `tmp/`, `docs/`, `tasks/`, `DataSheets/`.
 
-| Skill | Workflow step | Purpose |
-|---|---|---|
-| `/task-new` | 2–4 | Study memory and code, write the brief for ChatGPT |
-| `/task-review` | 6 | Datasheet and testability check, development and test plans, PDF export |
-| `/task-implement` | 9–12 | After approvals: task branch, tests (RED), implementation, full test run, Test Procedure (validated), commit |
-| `/task-close` | 13 | Merge into `development`, completion report, PDF, memory |
-| `/memory-update` | — | Full memory update and size control |
-| `/export-pdf` | 6, 13 | Markdown → PDF export copy (offline, macOS + Ubuntu) |
+## 5. Safety
 
-New skills are added per section 0.3.
+- Before deleting or overwriting a file, look at it first.
+- Do not run destructive commands (`git reset --hard`, `git push --force`, `rm -rf`, `git clean`)
+  without explicit permission.
+- If a requirement is unclear or a decision belongs to the user, ask instead of guessing.
+
+## 6. Build and Test Tools
+
+All tools needed to build and test the code (compilers, toolchains, SDKs, test frameworks,
+linters, flashing and debug utilities) are provided in this order of priority:
+
+1. **System tools (preferred)** — if the tool is already installed on the host, use it.
+   - Check it is available and its version suits the repository (toolchain files, CI config,
+     README): e.g. `command -v <tool>`, `<tool> --version`.
+   - Use it as is: do not upgrade, downgrade or reconfigure system tools.
+   - If the tool is missing or its version does not suit the repository, go to step 2.
+2. **Docker** — if no suitable system tool is available.
+   - If the repository already has a Docker setup (`Dockerfile`, `docker-compose.yml`,
+     `.devcontainer/`, CI image), use it.
+   - Otherwise create one outside the repository: `tools/docker/<repo>/Dockerfile`
+     (put it into `<repo>/` only if the user asks).
+   - Mount the task worktree into the container and run the build and tests inside it,
+     e.g. (run from the project root):
+
+     ```sh
+     docker build -t <repo>-build tools/docker/<repo>
+     docker run --rm -v "$PWD/worktrees/<repo>/<task-name>:/work" -w /work <repo>-build <build-or-test-command>
+     ```
+
+   - Pin versions: base image tag and package versions, no `latest`.
+3. **`tools/` folder** — only if Docker is not possible either (no Docker on the host,
+   the tool needs direct hardware/USB access, no Linux image of the tool, etc.).
+   - Install into `tools/<tool-name>-<version>/` (portable archive, `--prefix`, Python venv
+     `tools/venv/`, ...). Call tools by their path in `tools/`; do not change the global `PATH`
+     or shell profile.
+
+Rules for all options:
+
+- Tell the user which option was used for each tool (system, Docker or `tools/`) and, if it is
+  not the system tool, why.
+- **Do not install tools system-wide**: no `sudo apt install`, `brew install`, global
+  `pip install` / `npm install -g`. If a system-level component is unavoidable (e.g. Docker itself,
+  USB drivers, udev rules), ask the user.
+- Every tool is recorded in `tools/README.md`: name, version, source (URL or package), how it was
+  installed (Docker image, system tool with its path, or path in `tools/`), and the commands
+  to build and run tests.
+  Check this file first: reuse what is already there instead of installing again.
+- Downloads and installations of new tools — tell the user what is being installed and why.
+- Do not put tools, archives, images or their caches inside `<repo>/`.
+
+## 7. MEMORY.md — Project Knowledge
+
+[`MEMORY.md`](MEMORY.md) (next to this file) holds the specifics of working with the project
+repositories: non-obvious build steps, hardware quirks, known pitfalls, decisions and their reasons.
+
+- **Read it** after `AGENTS.md`, before any work in a repository.
+- **Write to it only when the user asks** (e.g. "add this to MEMORY", "remember this").
+  Never add, change or delete entries on your own initiative. If something looks worth recording,
+  suggest it to the user and wait for an answer.
+- The agent's own built-in memory (if any) does not replace `MEMORY.md`: project knowledge
+  that should be shared between agents goes only to `MEMORY.md`, and only on request.
+- Format: English, Markdown, follow the structure described at the top of `MEMORY.md`.
+- If an entry contradicts the code or `AGENTS.md`, do not act on it silently — tell the user.
